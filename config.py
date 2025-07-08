@@ -19,8 +19,35 @@ DEFAULT_HISTORY_DIR = "history"
 TEMP_DIR = "temp"
 
 # Create directories if they don't exist
-for directory in [DEFAULT_OUTPUT_DIR, DEFAULT_SESSION_DIR, DEFAULT_HISTORY_DIR, TEMP_DIR]:
-    os.makedirs(directory, exist_ok=True)
+def create_required_directories():
+    """Create required application directories with proper error handling"""
+    required_dirs = [DEFAULT_OUTPUT_DIR, DEFAULT_SESSION_DIR, DEFAULT_HISTORY_DIR, TEMP_DIR]
+    
+    for directory in required_dirs:
+        try:
+            os.makedirs(directory, exist_ok=True)
+            # Test write permissions by creating a test file
+            test_file = os.path.join(directory, '.test')
+            try:
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+            except (IOError, OSError) as e:
+                print(f"Warning: Directory '{directory}' exists but is not writable: {str(e)}")
+                # Try to create in user's home directory instead
+                user_dir = os.path.expanduser(f"~/.seo_analyzer/{directory}")
+                os.makedirs(user_dir, exist_ok=True)
+                globals()[directory.upper()] = user_dir  # Update the global variable
+        except Exception as e:
+            print(f"Error creating directory '{directory}': {str(e)}")
+            # Fall back to temporary directory
+            import tempfile
+            temp_dir = os.path.join(tempfile.gettempdir(), 'seo_analyzer', directory)
+            os.makedirs(temp_dir, exist_ok=True)
+            globals()[directory.upper()] = temp_dir  # Update the global variable
+
+# Create directories with error handling
+create_required_directories()
 
 # Scraping Configuration
 REQUEST_DELAY = 2.0  # Seconds between requests

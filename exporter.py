@@ -30,10 +30,41 @@ class ResultExporter:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         
+        # Check and initialize optional dependencies
+        self.check_optional_dependencies()
+        
         # PDF styles
-        if REPORTLAB_AVAILABLE:
+        if self.reportlab_available:
             self.styles = getSampleStyleSheet()
             self.setup_pdf_styles()
+            
+    def check_optional_dependencies(self):
+        """Check availability of optional dependencies and set flags"""
+        # Check ReportLab
+        try:
+            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.platypus import SimpleDocTemplate
+            from reportlab.lib.styles import getSampleStyleSheet
+            self.reportlab_available = True
+        except ImportError:
+            self.reportlab_available = False
+            self.logger.warning("ReportLab not available. PDF export will be disabled. Install with: pip install reportlab")
+            
+        # Check Pandas
+        try:
+            import pandas as pd
+            self.pandas_available = True
+        except ImportError:
+            self.pandas_available = False
+            self.logger.warning("Pandas not available. Enhanced Excel export will be disabled. Install with: pip install pandas")
+            
+        # Check openpyxl for Excel support
+        try:
+            import openpyxl
+            self.excel_available = True
+        except ImportError:
+            self.excel_available = False
+            self.logger.warning("openpyxl not available. Excel export will be disabled. Install with: pip install openpyxl")
         
     def setup_pdf_styles(self):
         """Setup custom PDF styles for professional reports"""

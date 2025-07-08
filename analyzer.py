@@ -46,7 +46,16 @@ class KeywordAnalyzer:
         }
         
     def setup_nltk(self):
-        """Download required NLTK data packages"""
+        """Download required NLTK data packages with SSL handling"""
+        import ssl
+
+        try:
+            _create_unverified_https_context = ssl._create_unverified_context
+        except AttributeError:
+            pass
+        else:
+            ssl._create_default_https_context = _create_unverified_https_context
+
         nltk_packages = [
             'punkt', 'stopwords', 'wordnet', 'averaged_perceptron_tagger',
             'maxent_ne_chunker', 'words', 'omw-1.4'
@@ -57,6 +66,13 @@ class KeywordAnalyzer:
                 nltk.download(package, quiet=True)
             except Exception as e:
                 self.logger.warning(f"Could not download NLTK package {package}: {str(e)}")
+                # Attempt to create data directory manually if it doesn't exist
+                try:
+                    import os
+                    nltk_data_dir = os.path.expanduser('~/nltk_data')
+                    os.makedirs(nltk_data_dir, exist_ok=True)
+                except Exception as dir_e:
+                    self.logger.error(f"Could not create NLTK data directory: {str(dir_e)}")
                 
     def preprocess_text(self, text: str, preserve_phrases: bool = True) -> str:
         """
@@ -339,15 +355,17 @@ class KeywordAnalyzer:
         
     def analyze_multiple_texts(self, texts: List[str], min_frequency: int = 2,
                              exclude_common_words: bool = True,
-                             custom_stopwords: List[str] = None) -> Dict[str, Dict]:
+                             custom_stopwords: List[str] = None,
+                             batch_size: int = 5) -> Dict[str, Dict]:
         """
-        Analyze keywords across multiple texts (competitor analysis)
+        Analyze keywords across multiple texts (competitor analysis) with batch processing
         
         Args:
             texts: List of text content to analyze
             min_frequency: Minimum frequency across all texts
             exclude_common_words: Whether to exclude common words
             custom_stopwords: Additional stopwords to exclude
+            batch_size: Number of texts to process in each batch
             
         Returns:
             Dictionary of keywords with aggregate analysis data
@@ -355,15 +373,7 @@ class KeywordAnalyzer:
         if not texts:
             return {}
             
-        # Analyze each text individually
-        all_analyses = []
-        for i, text in enumerate(texts):
-            analysis = self.analyze_text(text, min_frequency=1, 
-                                       exclude_common_words=exclude_common_words,
-                                       custom_stopwords=custom_stopwords)
-            all_analyses.append(analysis)
-            
-        # Aggregate results
+        # Initialize aggregated results
         aggregated_keywords = defaultdict(lambda: {
             'frequency': 0,
             'sources': [],
@@ -373,22 +383,43 @@ class KeywordAnalyzer:
             'avg_position': 0
         })
         
-        for i, analysis in enumerate(all_analyses):
-            for keyword, data in analysis.items():
-                agg_data = aggregated_keywords[keyword]
-                agg_data['frequency'] += data['frequency']
-                agg_data['sources'].append(i)
-                agg_data['total_importance'] += data['importance_score']
-                agg_data['document_frequency'] += 1
-                
-        # Calculate averages and filter by minimum frequency
+        # Process texts in batches
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i + batch_size]
+            self.logger.info(f"Processing batch {i//batch_size + 1}/{(len(texts) + batch_size - 1)//batch_size}")
+            
+            # Analyze each text in the batch
+            batch_analyses = []
+            for j, text in enumerate(batch):
+                try:
+                    analysis = self.analyze_text(text, min_frequency=1, 
+                                             exclude_common_words=exclude_common_words,
+                                             custom_stopwords=custom_stopwords)
+                    batch_analyses.append(analysis)
+                except Exception as e:
+                    self.logger.error(f"Error analyzing text {i+j}: {str(e)}")
+                    continue
+            
+            # Aggregate batch results
+            for j, analysis in enumerate(batch_analyses):
+                for keyword, data in analysis.items():
+                    agg_data = aggregated_keywords[keyword]
+                    agg_data['frequency'] += data['frequency']
+                    agg_data['sources'].append(i + j)
+                    agg_data['total_importance'] += data['importance_score']
+                    agg_data['document_frequency'] += 1
+            
+            # Clear batch data to free memory
+            batch_analyses.clear()
+        
+        # Calculate final averages and filter by minimum frequency
         final_keywords = {}
         for keyword, data in aggregated_keywords.items():
             if data['frequency'] >= min_frequency:
                 data['avg_importance'] = data['total_importance'] / data['document_frequency']
                 data['avg_position'] = data['frequency'] / len(texts)
                 final_keywords[keyword] = data
-                
+        
         return final_keywords
         
     def extract_named_entities(self, text: str) -> Dict[str, List[str]]:

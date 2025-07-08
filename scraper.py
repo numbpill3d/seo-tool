@@ -21,6 +21,9 @@ class GoogleScraper:
         self.current_ua_index = 0
         self.request_delay = config.REQUEST_DELAY
         self.timeout = config.REQUEST_TIMEOUT
+        self.max_retries = config.MAX_RETRIES
+        self.retry_delay = config.RETRY_DELAY
+        self.last_request_time = 0
         
         # Setup logging
         logging.basicConfig(level=logging.INFO)
@@ -28,6 +31,85 @@ class GoogleScraper:
         
         # Setup session headers
         self.setup_session()
+        
+        # Initialize rate limiting
+        self.request_times = []
+        self.rate_limit_window = 60  # 1 minute window
+        self.max_requests_per_window = 10  # Maximum requests per minute
+        
+    def wait_for_rate_limit(self):
+        """Implement rate limiting with sliding window"""
+        current_time = time.time()
+        
+        # Remove old requests from window
+        self.request_times = [t for t in self.request_times 
+                            if current_time - t < self.rate_limit_window]
+        
+        # If we've hit the rate limit, wait
+        if len(self.request_times) >= self.max_requests_per_window:
+            wait_time = self.request_times[0] + self.rate_limit_window - current_time
+            if wait_time > 0:
+                self.logger.info(f"Rate limit reached, waiting {wait_time:.2f} seconds")
+                time.sleep(wait_time)
+        
+        # Add current request to window
+        self.request_times.append(current_time)
+        
+    def make_request(self, url: str, method: str = 'get', **kwargs) -> requests.Response:
+        """
+        Make HTTP request with exponential backoff retry logic
+        
+        Args:
+            url: URL to request
+            method: HTTP method (get, post, etc.)
+            **kwargs: Additional arguments for requests
+            
+        Returns:
+            Response object
+            
+        Raises:
+            requests.RequestException after all retries fail
+        """
+        retry_count = 0
+        last_exception = None
+        
+        while retry_count <= self.max_retries:
+            try:
+                # Implement rate limiting
+                self.wait_for_rate_limit()
+                
+                # Add random delay between requests
+                self.add_request_delay()
+                
+                # Rotate user agent
+                self.rotate_user_agent()
+                
+                # Make request
+                response = getattr(self.session, method.lower())(url, timeout=self.timeout, **kwargs)
+                response.raise_for_status()
+                
+                return response
+                
+            except requests.RequestException as e:
+                retry_count += 1
+                last_exception = e
+                
+                if retry_count <= self.max_retries:
+                    # Calculate exponential backoff delay
+                    delay = min(300, self.retry_delay * (2 ** (retry_count - 1))) # Max 5 minutes
+                    # Add random jitter
+                    delay += random.uniform(0, min(1, delay * 0.1))
+                    
+                    self.logger.warning(
+                        f"Request failed (attempt {retry_count}/{self.max_retries}): {str(e)}. "
+                        f"Retrying in {delay:.1f} seconds..."
+                    )
+                    
+                    time.sleep(delay)
+                    continue
+                    
+        # If we get here, all retries failed
+        raise last_exception
         
     def setup_session(self):
         """Configure session with appropriate headers"""
@@ -69,15 +151,8 @@ class GoogleScraper:
             
             self.logger.info(f"Scraping Google results for: {query}")
             
-            # Rotate user agent
-            self.rotate_user_agent()
-            
-            # Add delay before request
-            self.add_request_delay()
-            
-            # Make request
-            response = self.session.get(search_url, timeout=self.timeout)
-            response.raise_for_status()
+            # Make request with retry logic
+            response = self.make_request(search_url)
             
             # Parse results
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -197,15 +272,8 @@ class GoogleScraper:
         try:
             self.logger.info(f"Extracting content from: {url}")
             
-            # Rotate user agent
-            self.rotate_user_agent()
-            
-            # Add delay
-            self.add_request_delay()
-            
-            # Make request
-            response = self.session.get(url, timeout=self.timeout)
-            response.raise_for_status()
+            # Make request with retry logic
+            response = self.make_request(url)
             
             # Parse content
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -314,15 +382,8 @@ class GoogleScraper:
         }
         
         try:
-            # Rotate user agent
-            self.rotate_user_agent()
-            
-            # Add delay
-            self.add_request_delay()
-            
-            # Make request
-            response = self.session.get(url, timeout=self.timeout)
-            response.raise_for_status()
+            # Make request with retry logic
+            response = self.make_request(url)
             
             # Parse content
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -352,28 +413,38 @@ class GoogleScraper:
             
         return metadata
         
-    def batch_scrape_urls(self, urls: List[str]) -> Dict[str, str]:
+    def batch_scrape_urls(self, urls: List[str], batch_size: int = 5) -> Dict[str, str]:
         """
-        Batch scrape content from multiple URLs
+        Batch scrape content from multiple URLs with memory management
         
         Args:
             urls: List of URLs to scrape
+            batch_size: Number of URLs to process in each batch
             
         Returns:
             Dictionary mapping URLs to extracted content
         """
         results = {}
         
-        for i, url in enumerate(urls):
-            self.logger.info(f"Scraping URL {i+1}/{len(urls)}: {url}")
+        # Process URLs in batches
+        for i in range(0, len(urls), batch_size):
+            batch = urls[i:i + batch_size]
+            self.logger.info(f"Processing batch {i//batch_size + 1}/{(len(urls) + batch_size - 1)//batch_size}")
             
-            content = self.extract_content_from_url(url)
-            if content:
-                results[url] = content
+            for url in batch:
+                try:
+                    content = self.extract_content_from_url(url)
+                    if content:
+                        results[url] = content
+                except Exception as e:
+                    self.logger.error(f"Error processing URL {url}: {str(e)}")
+                    continue
                 
-            # Add extra delay for batch operations
-            if i < len(urls) - 1:
-                time.sleep(random.uniform(1, 3))
+            # Add extra delay between batches
+            if i + batch_size < len(urls):
+                delay = random.uniform(2, 5)
+                self.logger.info(f"Batch complete. Waiting {delay:.1f} seconds before next batch...")
+                time.sleep(delay)
                 
         return results
         
