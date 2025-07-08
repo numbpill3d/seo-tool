@@ -1,0 +1,296 @@
+# Core Dependencies for SEO Rank & Content Gap Analyzer
+# Python 3.8+ required
+
+# GUI Framework
+tkinter  # Usually included with Python, but listed for completeness
+
+# Web Scraping and HTTP Requests
+requests>=2.28.0
+beautifulsoup4>=4.11.0
+lxml>=4.9.0
+urllib3>=1.26.0
+
+# Natural Language Processing
+nltk>=3.8
+textblob>=0.17.0
+
+# Data Processing and Analysis
+pandas>=1.5.0
+numpy>=1.21.0
+
+# Export Functionality
+reportlab>=3.6.0  # PDF generation
+openpyxl>=3.0.0   # Excel file support
+
+# Optional Premium API Integrations
+google-search-results>=2.4.0  # SerpAPI integration (optional)
+semrush>=2.0.0                 # SEMrush API (optional, if available)
+
+# Development and Testing (optional)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=22.0.0
+flake8>=5.0.0
+
+# Logging and Configuration
+pyyaml>=6.0        # YAML configuration support (optional)
+python-dotenv>=0.19.0  # Environment variable management
+
+# Performance and Caching
+redis>=4.3.0       # Redis caching (optional)
+diskcache>=5.4.0   # Disk-based caching alternative
+
+# Security
+cryptography>=37.0.0  # For secure API key storage
+
+# Monitoring and Analytics (for SaaS features)
+sentry-sdk>=1.9.0     # Error tracking (optional)
+stripe>=4.0.0         # Payment processing (optional)
+
+# Database Support (for multi-user features)
+sqlalchemy>=1.4.0     # Database ORM (optional)
+psycopg2-binary>=2.9.0  # PostgreSQL support (optional)
+pymongo>=4.2.0        # MongoDB support (optional)
+
+# Email Support
+smtplib  # Usually included with Python
+email-validator>=1.3.0  # Email validation
+
+# Threading and Async Support
+asyncio  # Usually included with Python
+concurrent.futures  # Usually included with Python
+
+# File and Data Handling
+chardet>=5.0.0     # Character encoding detection
+python-magic>=0.4.27  # File type detection
+
+# Mathematical Operations
+scipy>=1.9.0       # Scientific computing (optional for advanced analysis)
+scikit-learn>=1.1.0  # Machine learning (optional for semantic analysis)
+
+# Networking and Proxy Support
+requests[socks]>=2.28.0  # SOCKS proxy support
+fake-useragent>=1.1.0    # Dynamic user agent generation
+
+# Image Processing (for future features)
+Pillow>=9.2.0      # Image processing (optional)
+
+# Text Processing Enhancements
+spacy>=3.4.0       # Advanced NLP (optional)
+transformers>=4.21.0  # AI-powered text analysis (optional)
+
+# API Framework (for future API endpoints)
+fastapi>=0.85.0    # Fast API framework (optional)
+uvicorn>=0.18.0    # ASGI server (optional)
+
+# Configuration Management
+configparser  # Usually included with Python
+json  # Usually included with Python
+
+# Date and Time Handling
+python-dateutil>=2.8.0
+pytz>=2022.2
+
+# Progress Bars and UI Enhancements
+tqdm>=4.64.0       # Progress bars for CLI version
+
+# Validation and Data Quality
+cerberus>=1.3.0    # Data validation
+marshmallow>=3.17.0  # Serialization/deserialization
+
+# Development Tools
+pre-commit>=2.20.0  # Git hooks for code quality
+mypy>=0.971        # Type checking
+bandit>=1.7.0      # Security linting
+
+# Documentation
+sphinx>=5.1.0      # Documentation generation (optional)
+sphinx-rtd-theme>=1.0.0  # Documentation theme (optional)
+
+# Platform-specific Dependencies
+# Windows
+pywin32>=227; sys_platform == "win32"  # Windows API access
+
+# macOS
+# No specific macOS dependencies required
+
+# Linux
+# Most dependencies work cross-platform
+
+# Version Constraints for Stability
+# Ensure compatibility across different environments
+setuptools>=65.0.0
+wheel>=0.37.0
+pip>=22.0.0
+
+# Alternative HTTP Libraries (backup options)
+httpx>=0.23.0      # Modern HTTP client (alternative to requests)
+
+# Alternative GUI Frameworks (for future versions)
+# PyQt5>=5.15.0    # Alternative GUI framework
+# tkinter-modern>=1.0.0  # Modern tkinter themes
+
+# Monitoring and Performance
+psutil>=5.9.0      # System and process monitoring
+memory-profiler>=0.60.0  # Memory usage profiling (development)
+
+# Backup and Data Export
+zipfile  # Usually included with Python
+tarfile  # Usually included with Python
+gzip    # Usually included with Python
+
+# Regular Expressions and Pattern Matching
+re      # Usually included with Python
+regex>=2022.9.0  # Enhanced regex support (optional)
+
+# JSON and Data Serialization
+simplejson>=3.17.0  # Enhanced JSON support (alternative)
+msgpack>=1.0.0     # MessagePack serialization (optional)
+
+# Internationalization (for future multi-language support)
+babel>=2.10.0      # Internationalization utilities (optional)
+
+# Quality Assurance
+coverage>=6.4.0   # Code coverage measurement
+pytest-xdist>=2.5.0  # Parallel test execution
+
+# Documentation and Help
+docstring-parser>=0.15  # Parse docstrings for help system
+rich>=12.5.0       # Rich text and beautiful formatting (optional)
+
+# Environment and Platform Detection
+platform  # Usually included with Python
+sys      # Usually included with Python
+os       # Usually included with Python
+
+# Hashing and Checksums
+hashlib  # Usually included with Python
+hmac     # Usually included with Python
+
+# Compression
+zlib     # Usually included with Python
+bz2      # Usually included with Python
+lzma     # Usually included with Python
+
+# SSL and Security
+ssl      # Usually included with Python
+secrets  # Usually included with Python
+
+# Multi-processing and Threading
+multiprocessing  # Usually included with Python
+threading       # Usually included with Python
+queue          # Usually included with Python
+
+# File System Operations
+pathlib  # Usually included with Python
+glob     # Usually included with Python
+shutil   # Usually included with Python
+
+# URL and Network Utilities
+socket   # Usually included with Python
+ipaddress  # Usually included with Python
+
+# Random and UUID Generation
+random   # Usually included with Python
+uuid     # Usually included with Python
+
+# Collections and Data Structures
+collections  # Usually included with Python
+itertools   # Usually included with Python
+functools   # Usually included with Python
+
+# Time and Calendar
+time     # Usually included with Python
+datetime # Usually included with Python
+calendar # Usually included with Python
+
+# Mathematical Functions
+math     # Usually included with Python
+statistics  # Usually included with Python
+decimal    # Usually included with Python
+fractions  # Usually included with Python
+
+# Warning and Error Handling
+warnings # Usually included with Python
+traceback # Usually included with Python
+
+# Debugging and Inspection
+inspect  # Usually included with Python
+pdb      # Usually included with Python
+
+# Testing Utilities
+unittest # Usually included with Python
+doctest  # Usually included with Python
+
+# Code Object and AST Manipulation
+ast      # Usually included with Python
+code     # Usually included with Python
+codeop   # Usually included with Python
+
+# Import System
+importlib # Usually included with Python
+pkgutil   # Usually included with Python
+
+# String and Text Processing
+string   # Usually included with Python
+textwrap # Usually included with Python
+difflib  # Usually included with Python
+
+# Binary Data Handling
+struct   # Usually included with Python
+binascii # Usually included with Python
+base64   # Usually included with Python
+
+# Weak References
+weakref  # Usually included with Python
+
+# Context Management
+contextlib # Usually included with Python
+
+# Copy Operations
+copy     # Usually included with Python
+
+# Pickle Serialization
+pickle   # Usually included with Python
+
+# Command Line Argument Parsing
+argparse # Usually included with Python
+
+# Subprocess Management
+subprocess # Usually included with Python
+
+# Signal Handling
+signal   # Usually included with Python
+
+# Locale Information
+locale   # Usually included with Python
+
+# Temporary Files
+tempfile # Usually included with Python
+
+# CSV File Handling
+csv      # Usually included with Python
+
+# SQLite Database
+sqlite3  # Usually included with Python
+
+# HTTP Server (for development)
+http.server # Usually included with Python
+
+# XML Processing
+xml.etree.ElementTree # Usually included with Python
+
+# HTML Processing
+html     # Usually included with Python
+html.parser # Usually included with Python
+
+# Email Processing
+email    # Usually included with Python
+smtpd    # Usually included with Python (deprecated in 3.12+)
+
+# FTP and Network Protocols
+ftplib   # Usually included with Python
+telnetlib # Usually included with Python (deprecated in 3.13+)
+
+# Multimedia
+mimetypes # Usually included with Python
