@@ -6,19 +6,20 @@ setup(
     packages=find_packages(),
     install_requires=[
         line.strip()
-        for line in open("requirements.txt")
+        for line in open("requirements.txt", "r", encoding="utf-8")
         if line.strip() and not line.startswith("#") and not line.startswith("git+")
     ],
     entry_points={
         'console_scripts': [
             'seo-analyzer=main:main',
+            'seo-cli=cli:main',
         ],
     },
     python_requires='>=3.8',
-    author="Your Company Name",
-    author_email="contact@example.com",
+    author="SEO Analyzer Team",
+    author_email="support@seoanalyzer.com",
     description="SEO Rank & Content Gap Analyzer Pro",
-    long_description=open("readme.md").read(),
+    long_description=open("readme.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/yourusername/seo-analyzer",
     classifiers=[

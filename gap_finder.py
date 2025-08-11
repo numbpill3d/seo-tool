@@ -9,6 +9,21 @@ class ContentGapFinder:
     Identifies missing keywords and content opportunities
     """
     
+    # Constants for scoring and classification
+    FREQUENCY_SCORE_MULTIPLIER = 2
+    DOC_FREQ_SCORE_MULTIPLIER = 5
+    IMPORTANCE_SCORE_DIVISOR = 5
+    LENGTH_BONUS_MULTIPLIER = 2
+    RELEVANCE_BONUS_MULTIPLIER = 3
+    SIMILARITY_THRESHOLD = 0.3
+    PARTIAL_MATCH_BONUS = 0.1
+    MAX_PARTIAL_BONUS = 0.3
+    
+    # Word count thresholds
+    SINGLE_WORD_COUNT = 1
+    TWO_WORD_COUNT = 2
+    LONG_TAIL_MIN_WORDS = 4
+    
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         
@@ -17,6 +32,36 @@ class ContentGapFinder:
             'high': 75,
             'medium': 50,
             'low': 25
+        }
+        
+        # Keyword classification indicators
+        self.commercial_indicators = {
+            'buy', 'purchase', 'order', 'shop', 'sale', 'deal', 'discount',
+            'cheap', 'best', 'top', 'review', 'compare', 'vs', 'versus'
+        }
+        
+        self.informational_indicators = {
+            'how', 'what', 'why', 'when', 'where', 'guide', 'tutorial',
+            'tips', 'learn', 'understand', 'explain', 'definition'
+        }
+        
+        self.local_indicators = {
+            'near', 'local', 'nearby', 'around', 'close', 'in', 'at'
+        }
+        
+        self.transactional_indicators = {
+            'buy', 'purchase', 'order', 'book', 'hire', 'contact',
+            'quote', 'price', 'cost', 'signup', 'register'
+        }
+        
+        self.navigational_indicators = {
+            'login', 'website', 'homepage', 'official', 'store',
+            'shop', 'account', 'dashboard'
+        }
+        
+        self.competitive_terms = {
+            'best', 'top', 'cheap', 'free', 'review', 'buy', 'online',
+            'service', 'company', 'business', 'professional'
         }
         
     def find_missing_keywords(self, competitor_keywords: Dict[str, Dict], 
@@ -39,7 +84,7 @@ class ContentGapFinder:
         competitor_terms = set(competitor_keywords.keys())
         user_terms = set(user_keywords.keys()) if user_keywords else set()
         
-        self.logger.info(f"Analyzing {len(competitor_terms)} competitor keywords against {len(user_terms)} user keywords")
+        self.logger.info("Analyzing %d competitor keywords against %d user keywords", len(competitor_terms), len(user_terms))
         
         # Find directly missing keywords
         directly_missing = competitor_terms - user_terms
@@ -57,7 +102,7 @@ class ContentGapFinder:
         # Sort opportunities by score
         missing_opportunities.sort(key=lambda x: x['opportunity_score'], reverse=True)
         
-        self.logger.info(f"Found {len(missing_opportunities)} keyword opportunities")
+        self.logger.info("Found %d keyword opportunities", len(missing_opportunities))
         
         return missing_opportunities
         
@@ -127,18 +172,18 @@ class ContentGapFinder:
             Opportunity score (0-100)
         """
         # Frequency component (0-30 points)
-        frequency_score = min(frequency * 2, 30)
+        frequency_score = min(frequency * self.FREQUENCY_SCORE_MULTIPLIER, 30)
         
         # Document frequency component (0-25 points)
         # Higher score if keyword appears on multiple competitor sites
-        doc_freq_score = min(document_frequency * 5, 25)
+        doc_freq_score = min(document_frequency * self.DOC_FREQ_SCORE_MULTIPLIER, 25)
         
         # Importance component (0-20 points)
-        importance_score = min(avg_importance / 5, 20)
+        importance_score = min(avg_importance / self.IMPORTANCE_SCORE_DIVISOR, 20)
         
         # Keyword length bonus (0-10 points)
         # Longer keywords often more specific and valuable
-        length_bonus = min(len(keyword.split()) * 2, 10)
+        length_bonus = min(len(keyword.split()) * self.LENGTH_BONUS_MULTIPLIER, 10)
         
         # Content relevance bonus (0-15 points)
         relevance_bonus = self.calculate_content_relevance(keyword, user_keywords)
@@ -173,7 +218,7 @@ class ContentGapFinder:
             
             if union > 0:
                 similarity = overlap / union
-                relevance_score += similarity * 3  # Max 3 points per related keyword
+                relevance_score += similarity * self.RELEVANCE_BONUS_MULTIPLIER
                 
         return min(relevance_score, 15)
         
@@ -224,41 +269,26 @@ class ContentGapFinder:
         """
         word_count = len(keyword.split())
         
-        # Commercial intent indicators
-        commercial_indicators = {
-            'buy', 'purchase', 'order', 'shop', 'sale', 'deal', 'discount',
-            'cheap', 'best', 'top', 'review', 'compare', 'vs', 'versus'
-        }
-        
-        # Informational intent indicators
-        informational_indicators = {
-            'how', 'what', 'why', 'when', 'where', 'guide', 'tutorial',
-            'tips', 'learn', 'understand', 'explain', 'definition'
-        }
-        
-        # Local intent indicators
-        local_indicators = {
-            'near', 'local', 'nearby', 'around', 'close', 'in', 'at'
-        }
+        # Use class attribute indicators
         
         keyword_lower = keyword.lower()
         
         # Check for commercial keywords
-        if any(indicator in keyword_lower for indicator in commercial_indicators):
+        if any(indicator in keyword_lower for indicator in self.commercial_indicators):
             return 'commercial'
         
         # Check for local keywords
-        if any(indicator in keyword_lower for indicator in local_indicators):
+        if any(indicator in keyword_lower for indicator in self.local_indicators):
             return 'local'
         
         # Check for informational keywords
-        if any(indicator in keyword_lower for indicator in informational_indicators):
+        if any(indicator in keyword_lower for indicator in self.informational_indicators):
             return 'informational'
         
         # Classify by length
-        if word_count == 1:
+        if word_count == self.SINGLE_WORD_COUNT:
             return 'head'
-        elif word_count == 2:
+        elif word_count == self.TWO_WORD_COUNT:
             return 'body'
         else:
             return 'long_tail'
@@ -275,24 +305,20 @@ class ContentGapFinder:
         """
         word_count = len(keyword.split())
         
-        # Competitive terms (typically harder)
-        competitive_terms = {
-            'best', 'top', 'cheap', 'free', 'review', 'buy', 'online',
-            'service', 'company', 'business', 'professional'
-        }
+        # Use class attribute competitive terms
         
         keyword_lower = keyword.lower()
         
         # Single word keywords are typically harder
-        if word_count == 1:
+        if word_count == self.SINGLE_WORD_COUNT:
             return 'high'
         
         # Keywords with competitive terms
-        if any(term in keyword_lower for term in competitive_terms):
-            return 'high' if word_count <= 2 else 'medium'
+        if any(term in keyword_lower for term in self.competitive_terms):
+            return 'high' if word_count <= self.TWO_WORD_COUNT else 'medium'
         
         # Long tail keywords are typically easier
-        if word_count >= 4:
+        if word_count >= self.LONG_TAIL_MIN_WORDS:
             return 'low'
         
         # Default to medium
@@ -310,29 +336,13 @@ class ContentGapFinder:
         """
         keyword_lower = keyword.lower()
         
-        # Transactional intent
-        transactional_words = {
-            'buy', 'purchase', 'order', 'book', 'hire', 'contact',
-            'quote', 'price', 'cost', 'signup', 'register'
-        }
+        # Use class attribute indicators
         
-        # Navigational intent
-        navigational_words = {
-            'login', 'website', 'homepage', 'official', 'store',
-            'shop', 'account', 'dashboard'
-        }
-        
-        # Informational intent
-        informational_words = {
-            'how', 'what', 'why', 'when', 'where', 'guide', 'tutorial',
-            'tips', 'learn', 'information', 'about', 'definition'
-        }
-        
-        if any(word in keyword_lower for word in transactional_words):
+        if any(word in keyword_lower for word in self.transactional_indicators):
             return 'transactional'
-        elif any(word in keyword_lower for word in navigational_words):
+        elif any(word in keyword_lower for word in self.navigational_indicators):
             return 'navigational'
-        elif any(word in keyword_lower for word in informational_words):
+        elif any(word in keyword_lower for word in self.informational_indicators):
             return 'informational'
         else:
             return 'commercial'
@@ -405,7 +415,7 @@ class ContentGapFinder:
             overlap = len(keyword_words.intersection(user_words))
             if overlap > 0:
                 similarity_score = overlap / len(keyword_words.union(user_words))
-                if similarity_score >= 0.3:  # 30% similarity threshold
+                if similarity_score >= self.SIMILARITY_THRESHOLD:
                     related_keywords.append(user_keyword)
                     
         return related_keywords[:5]  # Return top 5 related keywords
@@ -477,7 +487,7 @@ class ContentGapFinder:
                 if word1 in word2 or word2 in word1:
                     partial_matches += 1
                     
-        partial_bonus = min(partial_matches * 0.1, 0.3)
+        partial_bonus = min(partial_matches * self.PARTIAL_MATCH_BONUS, self.MAX_PARTIAL_BONUS)
         
         return min(jaccard_similarity + partial_bonus, 1.0)
         

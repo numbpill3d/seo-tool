@@ -5,12 +5,17 @@ import json
 import os
 from datetime import datetime
 import webbrowser
+import requests
 
 from scraper import GoogleScraper
 from analyzer import KeywordAnalyzer
 from gap_finder import ContentGapFinder
 from exporter import ResultExporter
 import config
+from logging_config import setup_logging, PerformanceTimer
+
+# Initialize logging
+setup_logging()
 
 class SEOAnalyzerGUI:
     def __init__(self, root):
@@ -461,12 +466,33 @@ class SEOAnalyzerGUI:
             messagebox.showerror("Error", "Please provide your content (URL, text, or file)")
             return
         
+        # Validate content based on method
+        content_method = self.content_method_var.get()
+        content_input = self.content_var.get().strip()
+        
+        if content_method == 'url':
+            if not content_input.startswith(('http://', 'https://')):
+                messagebox.showerror("Error", "URL must start with http:// or https://")
+                return
+        elif content_method == 'file':
+            if not os.path.exists(content_input):
+                messagebox.showerror("Error", f"File not found: {content_input}")
+                return
+        
+        # Validate keyword length
+        if len(self.keyword_var.get().strip()) > 100:
+            messagebox.showerror("Error", "Keyword is too long (max 100 characters)")
+            return
+        
         # Disable analyze button and enable stop button
         self.analyze_button.config(state=tk.DISABLED)
         self.stop_button.config(state=tk.NORMAL)
         
         # Clear previous results
         self.clear_results()
+        
+        # Initialize stop flag
+        self.stop_requested = False
         
         # Start analysis in separate thread
         self.analysis_thread = threading.Thread(target=self.run_analysis)
@@ -476,7 +502,10 @@ class SEOAnalyzerGUI:
     def run_analysis(self):
         """Run the complete SEO analysis"""
         try:
-            start_time = datetime.now()
+            from datetime import timezone
+            start_time = datetime.now(timezone.utc)
+            
+            with PerformanceTimer("Complete SEO Analysis"):
             
             # Update status
             self.update_status("Starting analysis...")
@@ -507,6 +536,9 @@ class SEOAnalyzerGUI:
             
             all_competitor_text = []
             for i, result in enumerate(search_results):
+                if self.stop_requested:
+                    return
+                    
                 self.update_status(f"Processing competitor {i+1}/{len(search_results)}...")
                 content = self.scraper.extract_content_from_url(result['url'])
                 if content:
@@ -556,18 +588,28 @@ class SEOAnalyzerGUI:
             self.root.after(0, self.display_results)
             
             # Calculate analysis time
-            end_time = datetime.now()
+            from datetime import timezone
+            end_time = datetime.now(timezone.utc)
             analysis_time = (end_time - start_time).total_seconds()
             
             self.root.after(0, lambda: self.time_label.config(
                 text=f"Analysis completed in {analysis_time:.1f} seconds"
             ))
             
-            self.update_progress(100)
-            self.update_status("Analysis completed successfully!")
+                self.update_progress(100)
+                self.update_status("Analysis completed successfully!")
             
+        except requests.RequestException as e:
+            self.root.after(0, lambda: messagebox.showerror("Network Error", f"Failed to connect to websites. Please check your internet connection.\n\nDetails: {str(e)}"))
+            self.update_status("Analysis failed: Network error")
+        except FileNotFoundError as e:
+            self.root.after(0, lambda: messagebox.showerror("File Error", f"File not found: {str(e)}"))
+            self.update_status("Analysis failed: File not found")
+        except PermissionError as e:
+            self.root.after(0, lambda: messagebox.showerror("Permission Error", f"Permission denied: {str(e)}"))
+            self.update_status("Analysis failed: Permission denied")
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Analysis Error", str(e)))
+            self.root.after(0, lambda: messagebox.showerror("Analysis Error", f"An unexpected error occurred:\n\n{str(e)}"))
             self.update_status(f"Analysis failed: {str(e)}")
         finally:
             # Re-enable analyze button and disable stop button
@@ -601,9 +643,17 @@ class SEOAnalyzerGUI:
         for item in self.missing_tree.get_children():
             self.missing_tree.delete(item)
             
+        # Cache sorted results for performance
+        if not hasattr(self, '_sorted_competitor_keywords'):
+            self._sorted_competitor_keywords = sorted(self.competitor_keywords.items(), 
+                                                     key=lambda x: x[1]['frequency'], reverse=True)
+        
+        if not hasattr(self, '_sorted_missing_keywords'):
+            self._sorted_missing_keywords = sorted(self.missing_keywords, 
+                                                  key=lambda x: x['opportunity_score'], reverse=True)
+            
         # Display competitor keywords
-        for keyword, data in sorted(self.competitor_keywords.items(), 
-                                   key=lambda x: x[1]['frequency'], reverse=True):
+        for keyword, data in self._sorted_competitor_keywords:
             self.competitor_tree.insert('', 'end', values=(
                 keyword,
                 data['frequency'],
@@ -612,8 +662,7 @@ class SEOAnalyzerGUI:
             ))
         
         # Display missing keywords
-        for keyword_data in sorted(self.missing_keywords, 
-                                  key=lambda x: x['opportunity_score'], reverse=True):
+        for keyword_data in self._sorted_missing_keywords:
             self.missing_tree.insert('', 'end', values=(
                 keyword_data['keyword'],
                 keyword_data['priority'],
@@ -717,23 +766,70 @@ class SEOAnalyzerGUI:
         
     def filter_competitor_keywords(self):
         """Filter competitor keywords based on frequency"""
-        # Implementation for filtering would go here
-        pass
+        min_freq = self.freq_filter_var.get()
+        
+        # Clear existing items
+        for item in self.competitor_tree.get_children():
+            self.competitor_tree.delete(item)
+            
+        # Re-populate with filtered data
+        for keyword, data in sorted(self.competitor_keywords.items(), 
+                                   key=lambda x: x[1]['frequency'], reverse=True):
+            if data['frequency'] >= min_freq:
+                self.competitor_tree.insert('', 'end', values=(
+                    keyword,
+                    data['frequency'],
+                    len(data.get('sources', [])),
+                    f"{data.get('avg_position', 0):.1f}"
+                ))
         
     def search_keywords(self, event):
         """Search keywords in real-time"""
-        # Implementation for keyword search would go here
-        pass
+        search_term = self.keyword_search_var.get().lower()
+        
+        # Clear existing items
+        for item in self.competitor_tree.get_children():
+            self.competitor_tree.delete(item)
+            
+        # Re-populate with filtered data
+        for keyword, data in sorted(self.competitor_keywords.items(), 
+                                   key=lambda x: x[1]['frequency'], reverse=True):
+            if not search_term or search_term in keyword.lower():
+                self.competitor_tree.insert('', 'end', values=(
+                    keyword,
+                    data['frequency'],
+                    len(data.get('sources', [])),
+                    f"{data.get('avg_position', 0):.1f}"
+                ))
         
     def filter_missing_keywords(self, event):
         """Filter missing keywords by priority"""
-        # Implementation for priority filtering would go here
-        pass
+        priority_filter = self.priority_var.get()
+        
+        # Clear existing items
+        for item in self.missing_tree.get_children():
+            self.missing_tree.delete(item)
+            
+        # Re-populate with filtered data
+        for keyword_data in sorted(self.missing_keywords, 
+                                  key=lambda x: x['opportunity_score'], reverse=True):
+            if priority_filter == "all" or keyword_data['priority'] == priority_filter:
+                self.missing_tree.insert('', 'end', values=(
+                    keyword_data['keyword'],
+                    keyword_data['priority'],
+                    keyword_data['competitor_frequency'],
+                    f"{keyword_data['opportunity_score']:.1f}"
+                ))
         
     def stop_analysis(self):
         """Stop the current analysis"""
         self.update_status("Stopping analysis...")
-        # Implementation to stop analysis thread
+        if hasattr(self, 'analysis_thread') and self.analysis_thread.is_alive():
+            # Set a flag to stop the analysis
+            self.stop_requested = True
+            self.analyze_button.config(state=tk.NORMAL)
+            self.stop_button.config(state=tk.DISABLED)
+            self.update_status("Analysis stopped by user")
         
     def clear_results(self):
         """Clear all analysis results"""
@@ -752,6 +848,12 @@ class SEOAnalyzerGUI:
         self.competitor_keywords = {}
         self.user_content_keywords = {}
         self.missing_keywords = []
+        
+        # Clear cached sorted results
+        if hasattr(self, '_sorted_competitor_keywords'):
+            delattr(self, '_sorted_competitor_keywords')
+        if hasattr(self, '_sorted_missing_keywords'):
+            delattr(self, '_sorted_missing_keywords')
         
         # Reset progress
         self.update_progress(0)
@@ -782,6 +884,10 @@ class SEOAnalyzerGUI:
                     }
                 )
                 messagebox.showinfo("Export Successful", f"Results exported to {filename}")
+            except PermissionError as e:
+                messagebox.showerror("Permission Error", f"Cannot write to file. Please check file permissions.\n\nDetails: {str(e)}")
+            except FileNotFoundError as e:
+                messagebox.showerror("File Error", f"Directory not found. Please check the path.\n\nDetails: {str(e)}")
             except Exception as e:
                 messagebox.showerror("Export Error", f"Failed to export: {str(e)}")
                 
@@ -810,6 +916,10 @@ class SEOAnalyzerGUI:
                     }
                 )
                 messagebox.showinfo("Export Successful", f"Results exported to {filename}")
+            except PermissionError as e:
+                messagebox.showerror("Permission Error", f"Cannot write to file. Please check file permissions.\n\nDetails: {str(e)}")
+            except FileNotFoundError as e:
+                messagebox.showerror("File Error", f"Directory not found. Please check the path.\n\nDetails: {str(e)}")
             except Exception as e:
                 messagebox.showerror("Export Error", f"Failed to export: {str(e)}")
                 
@@ -845,6 +955,8 @@ class SEOAnalyzerGUI:
                     json.dump(session_data, f, indent=2)
                     
                 messagebox.showinfo("Session Saved", f"Session saved to {filename}")
+            except PermissionError as e:
+                messagebox.showerror("Permission Error", f"Cannot write to file. Please check file permissions.\n\nDetails: {str(e)}")
             except Exception as e:
                 messagebox.showerror("Save Error", f"Failed to save session: {str(e)}")
                 
@@ -908,6 +1020,10 @@ class SEOAnalyzerGUI:
                 self.display_results()
                 
                 messagebox.showinfo("Session Loaded", "Session loaded successfully")
+            except FileNotFoundError as e:
+                messagebox.showerror("File Error", f"Session file not found: {str(e)}")
+            except json.JSONDecodeError as e:
+                messagebox.showerror("File Error", f"Invalid session file format: {str(e)}")
             except Exception as e:
                 messagebox.showerror("Load Error", f"Failed to load session: {str(e)}")
                 

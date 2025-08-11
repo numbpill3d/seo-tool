@@ -49,7 +49,7 @@ class GoogleScraper:
         if len(self.request_times) >= self.max_requests_per_window:
             wait_time = self.request_times[0] + self.rate_limit_window - current_time
             if wait_time > 0:
-                self.logger.info(f"Rate limit reached, waiting {wait_time:.2f} seconds")
+                self.logger.info("Rate limit reached, waiting %.2f seconds", wait_time)
                 time.sleep(wait_time)
         
         # Add current request to window
@@ -101,8 +101,8 @@ class GoogleScraper:
                     delay += random.uniform(0, min(1, delay * 0.1))
                     
                     self.logger.warning(
-                        f"Request failed (attempt {retry_count}/{self.max_retries}): {str(e)}. "
-                        f"Retrying in {delay:.1f} seconds..."
+                        "Request failed (attempt %d/%d): %s. Retrying in %.1f seconds...",
+                        retry_count, self.max_retries, str(e).replace('\n', '\\n').replace('\r', '\\r'), delay
                     )
                     
                     time.sleep(delay)
@@ -149,7 +149,7 @@ class GoogleScraper:
             encoded_query = quote_plus(query)
             search_url = f"https://www.google.com/search?q={encoded_query}&num={num_results}"
             
-            self.logger.info(f"Scraping Google results for: {query}")
+            self.logger.info("Scraping Google results for: %s", query.replace('\n', '\\n').replace('\r', '\\r'))
             
             # Make request with retry logic
             response = self.make_request(search_url)
@@ -165,12 +165,12 @@ class GoogleScraper:
                 if result_data:
                     results.append(result_data)
                     
-            self.logger.info(f"Successfully scraped {len(results)} results")
+            self.logger.info("Successfully scraped %d results", len(results))
             
         except requests.RequestException as e:
-            self.logger.error(f"Request error while scraping Google: {str(e)}")
+            self.logger.error("Request error while scraping Google: %s", str(e).replace('\n', '\\n').replace('\r', '\\r'))
         except Exception as e:
-            self.logger.error(f"Unexpected error while scraping Google: {str(e)}")
+            self.logger.error("Unexpected error while scraping Google: %s", str(e).replace('\n', '\\n').replace('\r', '\\r'))
             
         return results
         
@@ -220,7 +220,7 @@ class GoogleScraper:
             return result_data
             
         except Exception as e:
-            self.logger.warning(f"Error extracting result data: {str(e)}")
+            self.logger.warning("Error extracting result data: %s", str(e).replace('\n', '\\n').replace('\r', '\\r'))
             return None
             
     def clean_google_url(self, url: str) -> str:
@@ -270,7 +270,7 @@ class GoogleScraper:
             Extracted text content or None
         """
         try:
-            self.logger.info(f"Extracting content from: {url}")
+            self.logger.info("Extracting content from: %s", url.replace('\n', '\\n').replace('\r', '\\r'))
             
             # Make request with retry logic
             response = self.make_request(url)
@@ -291,9 +291,9 @@ class GoogleScraper:
             return text
             
         except requests.RequestException as e:
-            self.logger.warning(f"Request error extracting content from {url}: {str(e)}")
+            self.logger.warning("Request error extracting content from %s: %s", url.replace('\n', '\\n').replace('\r', '\\r'), str(e).replace('\n', '\\n').replace('\r', '\\r'))
         except Exception as e:
-            self.logger.warning(f"Error extracting content from {url}: {str(e)}")
+            self.logger.warning("Error extracting content from %s: %s", url.replace('\n', '\\n').replace('\r', '\\r'), str(e).replace('\n', '\\n').replace('\r', '\\r'))
             
         return None
         
@@ -331,9 +331,9 @@ class GoogleScraper:
             List of search results
         """
         try:
-            import serpapi
+            from serpapi import GoogleSearch
             
-            search = serpapi.GoogleSearch({
+            search = GoogleSearch({
                 "q": query,
                 "api_key": api_key,
                 "num": num_results
@@ -358,7 +358,7 @@ class GoogleScraper:
         except ImportError:
             self.logger.error("SerpAPI not installed. Install with: pip install google-search-results")
         except Exception as e:
-            self.logger.error(f"SerpAPI error: {str(e)}")
+            self.logger.error("SerpAPI error: %s", str(e).replace('\n', '\\n').replace('\r', '\\r'))
             
         return []
         
@@ -409,7 +409,7 @@ class GoogleScraper:
                 metadata[f'{level}_tags'] = [tag.get_text().strip() for tag in tags]
                 
         except Exception as e:
-            self.logger.warning(f"Error extracting metadata from {url}: {str(e)}")
+            self.logger.warning("Error extracting metadata from %s: %s", url.replace('\n', '\\n').replace('\r', '\\r'), str(e).replace('\n', '\\n').replace('\r', '\\r'))
             
         return metadata
         
@@ -429,7 +429,7 @@ class GoogleScraper:
         # Process URLs in batches
         for i in range(0, len(urls), batch_size):
             batch = urls[i:i + batch_size]
-            self.logger.info(f"Processing batch {i//batch_size + 1}/{(len(urls) + batch_size - 1)//batch_size}")
+            self.logger.info("Processing batch %d/%d", i//batch_size + 1, (len(urls) + batch_size - 1)//batch_size)
             
             for url in batch:
                 try:
@@ -437,13 +437,13 @@ class GoogleScraper:
                     if content:
                         results[url] = content
                 except Exception as e:
-                    self.logger.error(f"Error processing URL {url}: {str(e)}")
+                    self.logger.error("Error processing URL %s: %s", url.replace('\n', '\\n').replace('\r', '\\r'), str(e).replace('\n', '\\n').replace('\r', '\\r'))
                     continue
                 
             # Add extra delay between batches
             if i + batch_size < len(urls):
                 delay = random.uniform(2, 5)
-                self.logger.info(f"Batch complete. Waiting {delay:.1f} seconds before next batch...")
+                self.logger.info("Batch complete. Waiting %.1f seconds before next batch...", delay)
                 time.sleep(delay)
                 
         return results
@@ -504,6 +504,6 @@ class GoogleScraper:
                     }
                     
         except Exception as e:
-            self.logger.warning(f"Error extracting featured snippet: {str(e)}")
+            self.logger.warning("Error extracting featured snippet: %s", str(e).replace('\n', '\\n').replace('\r', '\\r'))
             
         return None

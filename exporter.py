@@ -128,7 +128,7 @@ class ResultExporter:
                 return self._export_csv_standard(filename, competitor_keywords, missing_keywords, metadata)
                 
         except Exception as e:
-            self.logger.error(f"Error exporting to CSV: {str(e)}")
+            self.logger.error("Error exporting to CSV: %s", str(e).replace('\n', '\\n').replace('\r', '\\r'))
             return False
             
     def _export_csv_pandas(self, filename: str, competitor_keywords: Dict[str, Dict],
@@ -328,7 +328,7 @@ class ResultExporter:
             return True
             
         except Exception as e:
-            self.logger.error(f"Error exporting to PDF: {str(e)}")
+            self.logger.error("Error exporting to PDF: %s", str(e).replace('\n', '\\n').replace('\r', '\\r'))
             return False
             
     def _add_title_page(self, story: List, metadata: Dict):
@@ -555,7 +555,7 @@ class ResultExporter:
             return True
             
         except Exception as e:
-            self.logger.error(f"Error exporting to JSON: {str(e)}")
+            self.logger.error("Error exporting to JSON: %s", str(e).replace('\n', '\\n').replace('\r', '\\r'))
             return False
             
     def _generate_summary_stats(self, competitor_keywords: Dict[str, Dict],
@@ -624,7 +624,7 @@ class ResultExporter:
             elif format_type == 'pdf':
                 results['pdf'] = self.export_to_pdf(filename, competitor_keywords, missing_keywords, metadata)
             else:
-                self.logger.warning(f"Unsupported export format: {format_type}")
+                self.logger.warning("Unsupported export format: %s", format_type.replace('\n', '\\n').replace('\r', '\\r'))
                 results[format_type] = False
                 
         return results

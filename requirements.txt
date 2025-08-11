@@ -19,7 +19,7 @@ pandas>=1.5.0
 numpy>=1.21.0
 
 # Export Functionality
-reportlab>=3.6.0  # PDF generation
+reportlab>=4.0.0  # PDF generation
 openpyxl>=3.0.0   # Excel file support
 
 # Optional Premium API Integrations
@@ -29,7 +29,7 @@ semrush>=2.0.0                 # SEMrush API (optional, if available)
 # Development and Testing (optional)
 pytest>=7.0.0
 pytest-cov>=4.0.0
-black>=22.0.0
+black>=24.3.0
 flake8>=5.0.0
 
 # Logging and Configuration
@@ -66,7 +66,7 @@ python-magic>=0.4.27  # File type detection
 
 # Mathematical Operations
 scipy>=1.9.0       # Scientific computing (optional for advanced analysis)
-scikit-learn>=1.1.0  # Machine learning (optional for semantic analysis)
+scikit-learn>=1.5.0  # Machine learning (optional for semantic analysis)
 
 # Networking and Proxy Support
 requests[socks]>=2.28.0  # SOCKS proxy support
@@ -120,7 +120,7 @@ pywin32>=227; sys_platform == "win32"  # Windows API access
 # Version Constraints for Stability
 # Ensure compatibility across different environments
 setuptools>=65.0.0
-wheel>=0.37.0
+wheel>=0.38.0
 pip>=22.0.0
 
 # Alternative HTTP Libraries (backup options)

@@ -437,9 +437,23 @@ def validate_config():
         assert REQUEST_DELAY >= 0, "REQUEST_DELAY must be non-negative"
         assert REQUEST_TIMEOUT > 0, "REQUEST_TIMEOUT must be positive"
         assert MAX_RETRIES >= 0, "MAX_RETRIES must be non-negative"
+        assert MAX_SEARCH_RESULTS > 0, "MAX_SEARCH_RESULTS must be positive"
+        assert MAX_CONTENT_LENGTH > 0, "MAX_CONTENT_LENGTH must be positive"
         
         # Validate user agents list
         assert len(USER_AGENTS) > 0, "USER_AGENTS list cannot be empty"
+        
+        # Validate priority thresholds
+        assert PRIORITY_THRESHOLDS['high'] > PRIORITY_THRESHOLDS['medium'], "High priority threshold must be greater than medium"
+        assert PRIORITY_THRESHOLDS['medium'] > PRIORITY_THRESHOLDS['low'], "Medium priority threshold must be greater than low"
+        
+        # Validate opportunity score weights sum to reasonable value
+        weight_sum = sum(OPPORTUNITY_SCORE_WEIGHTS.values())
+        assert 0.8 <= weight_sum <= 1.2, f"Opportunity score weights sum to {weight_sum}, should be close to 1.0"
+        
+        # Validate validation rules
+        assert VALIDATION_RULES['keyword_min_length'] > 0, "Keyword min length must be positive"
+        assert VALIDATION_RULES['keyword_max_length'] > VALIDATION_RULES['keyword_min_length'], "Max length must be greater than min length"
         
         return True
         

@@ -64,8 +64,10 @@ class KeywordAnalyzer:
         for package in nltk_packages:
             try:
                 nltk.download(package, quiet=True)
+            except (OSError, IOError) as e:
+                self.logger.warning("Could not download NLTK package %s: %s", package, str(e).replace('\n', '\\n').replace('\r', '\\r'))
             except Exception as e:
-                self.logger.warning(f"Could not download NLTK package {package}: {str(e)}")
+                self.logger.error("Unexpected error downloading NLTK package %s: %s", package, str(e).replace('\n', '\\n').replace('\r', '\\r'))
                 # Attempt to create data directory manually if it doesn't exist
                 try:
                     import os
@@ -177,9 +179,9 @@ class KeywordAnalyzer:
             words = word_tokenize(sentence.lower())
             
             # Generate n-grams
-            for n in range(min_words, max_words + 1):
-                for i in range(len(words) - n + 1):
-                    phrase_words = words[i:i + n]
+            for phrase_length in range(min_words, max_words + 1):
+                for i in range(len(words) - phrase_length + 1):
+                    phrase_words = words[i:i + phrase_length]
                     
                     # Filter phrase
                     if self.is_valid_phrase(phrase_words):
@@ -200,7 +202,7 @@ class KeywordAnalyzer:
         """
         # Must have at least one content word (not all stopwords)
         content_words = [w for w in words if w not in self.stop_words]
-        if len(content_words) == 0:
+        if not content_words:
             return False
             
         # Must not start or end with common connector words
@@ -288,12 +290,11 @@ class KeywordAnalyzer:
         text_lower = text.lower()
         keyword_lower = keyword.lower()
         
-        start = 0
-        while True:
-            pos = text_lower.find(keyword_lower, start)
-            if pos == -1:
-                break
-                
+        # Find keyword positions using regex for better performance
+        import re
+        pattern = re.escape(keyword_lower)
+        for match in re.finditer(pattern, text_lower):
+            pos = match.start()
             analysis['positions'].append(pos)
             
             # Extract context (surrounding words)
@@ -301,8 +302,6 @@ class KeywordAnalyzer:
             context_end = min(len(text), pos + len(keyword) + 50)
             context = text[context_start:context_end].strip()
             analysis['contexts'].append(context)
-            
-            start = pos + 1
             
         # Calculate importance score
         analysis['importance_score'] = self.calculate_importance_score(
@@ -386,7 +385,7 @@ class KeywordAnalyzer:
         # Process texts in batches
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
-            self.logger.info(f"Processing batch {i//batch_size + 1}/{(len(texts) + batch_size - 1)//batch_size}")
+            self.logger.info("Processing batch %d/%d", i//batch_size + 1, (len(texts) + batch_size - 1)//batch_size)
             
             # Analyze each text in the batch
             batch_analyses = []
@@ -397,7 +396,7 @@ class KeywordAnalyzer:
                                              custom_stopwords=custom_stopwords)
                     batch_analyses.append(analysis)
                 except Exception as e:
-                    self.logger.error(f"Error analyzing text {i+j}: {str(e)}")
+                    self.logger.error("Error analyzing text %d: %s", i+j, str(e).replace('\n', '\\n').replace('\r', '\\r'))
                     continue
             
             # Aggregate batch results
