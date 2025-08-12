@@ -506,96 +506,95 @@ class SEOAnalyzerGUI:
             start_time = datetime.now(timezone.utc)
             
             with PerformanceTimer("Complete SEO Analysis"):
-            
-            # Update status
-            self.update_status("Starting analysis...")
-            self.update_progress(5)
-            
-            # Prepare search query
-            keyword = self.keyword_var.get().strip()
-            location = self.location_var.get().strip()
-            search_query = f"{keyword} {location}" if location else keyword
-            
-            # Step 1: Scrape Google search results
-            self.update_status("Scraping Google search results...")
-            self.update_progress(10)
-            
-            search_results = self.scraper.scrape_google_results(
-                search_query, 
-                num_results=self.results_count_var.get()
-            )
-            
-            if not search_results:
-                self.update_status("No search results found")
-                return
+                # Update status
+                self.update_status("Starting analysis...")
+                self.update_progress(5)
                 
-            self.update_progress(30)
-            
-            # Step 2: Extract and analyze competitor content
-            self.update_status("Analyzing competitor content...")
-            
-            all_competitor_text = []
-            for i, result in enumerate(search_results):
-                if self.stop_requested:
+                # Prepare search query
+                keyword = self.keyword_var.get().strip()
+                location = self.location_var.get().strip()
+                search_query = f"{keyword} {location}" if location else keyword
+                
+                # Step 1: Scrape Google search results
+                self.update_status("Scraping Google search results...")
+                self.update_progress(10)
+                
+                search_results = self.scraper.scrape_google_results(
+                    search_query,
+                    num_results=self.results_count_var.get()
+                )
+                
+                if not search_results:
+                    self.update_status("No search results found")
                     return
                     
-                self.update_status(f"Processing competitor {i+1}/{len(search_results)}...")
-                content = self.scraper.extract_content_from_url(result['url'])
-                if content:
-                    all_competitor_text.append(content)
-                self.update_progress(30 + (i * 40 / len(search_results)))
-            
-            # Step 3: Analyze competitor keywords
-            self.update_status("Extracting competitor keywords...")
-            self.update_progress(75)
-            
-            # Get advanced options
-            min_freq = self.min_frequency_var.get()
-            exclude_common = self.exclude_common_var.get()
-            custom_stopwords = self.custom_stopwords_var.get().split(',') if self.custom_stopwords_var.get() else []
-            
-            self.competitor_keywords = self.analyzer.analyze_multiple_texts(
-                all_competitor_text,
-                min_frequency=min_freq,
-                exclude_common_words=exclude_common,
-                custom_stopwords=custom_stopwords
-            )
-            
-            # Step 4: Analyze user content
-            self.update_status("Analyzing your content...")
-            self.update_progress(85)
-            
-            user_content = self.get_user_content()
-            if user_content:
-                self.user_content_keywords = self.analyzer.analyze_text(
-                    user_content,
-                    min_frequency=1,  # Lower threshold for user content
+                self.update_progress(30)
+                
+                # Step 2: Extract and analyze competitor content
+                self.update_status("Analyzing competitor content...")
+                
+                all_competitor_text = []
+                for i, result in enumerate(search_results):
+                    if self.stop_requested:
+                        return
+                        
+                    self.update_status(f"Processing competitor {i+1}/{len(search_results)}...")
+                    content = self.scraper.extract_content_from_url(result['url'])
+                    if content:
+                        all_competitor_text.append(content)
+                    self.update_progress(30 + (i * 40 / len(search_results)))
+                
+                # Step 3: Analyze competitor keywords
+                self.update_status("Extracting competitor keywords...")
+                self.update_progress(75)
+                
+                # Get advanced options
+                min_freq = self.min_frequency_var.get()
+                exclude_common = self.exclude_common_var.get()
+                custom_stopwords = self.custom_stopwords_var.get().split(',') if self.custom_stopwords_var.get() else []
+                
+                self.competitor_keywords = self.analyzer.analyze_multiple_texts(
+                    all_competitor_text,
+                    min_frequency=min_freq,
                     exclude_common_words=exclude_common,
                     custom_stopwords=custom_stopwords
                 )
-            
-            # Step 5: Find content gaps
-            self.update_status("Identifying content gaps...")
-            self.update_progress(95)
-            
-            self.missing_keywords = self.gap_finder.find_missing_keywords(
-                self.competitor_keywords,
-                self.user_content_keywords
-            )
-            
-            # Step 6: Update GUI with results
-            self.update_status("Updating results...")
-            self.root.after(0, self.display_results)
-            
-            # Calculate analysis time
-            from datetime import timezone
-            end_time = datetime.now(timezone.utc)
-            analysis_time = (end_time - start_time).total_seconds()
-            
-            self.root.after(0, lambda: self.time_label.config(
-                text=f"Analysis completed in {analysis_time:.1f} seconds"
-            ))
-            
+                
+                # Step 4: Analyze user content
+                self.update_status("Analyzing your content...")
+                self.update_progress(85)
+                
+                user_content = self.get_user_content()
+                if user_content:
+                    self.user_content_keywords = self.analyzer.analyze_text(
+                        user_content,
+                        min_frequency=1,  # Lower threshold for user content
+                        exclude_common_words=exclude_common,
+                        custom_stopwords=custom_stopwords
+                    )
+                
+                # Step 5: Find content gaps
+                self.update_status("Identifying content gaps...")
+                self.update_progress(95)
+                
+                self.missing_keywords = self.gap_finder.find_missing_keywords(
+                    self.competitor_keywords,
+                    self.user_content_keywords
+                )
+                
+                # Step 6: Update GUI with results
+                self.update_status("Updating results...")
+                self.root.after(0, self.display_results)
+                
+                # Calculate analysis time
+                from datetime import timezone
+                end_time = datetime.now(timezone.utc)
+                analysis_time = (end_time - start_time).total_seconds()
+                
+                self.root.after(0, lambda: self.time_label.config(
+                    text=f"Analysis completed in {analysis_time:.1f} seconds"
+                ))
+                
                 self.update_progress(100)
                 self.update_status("Analysis completed successfully!")
             

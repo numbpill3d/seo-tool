@@ -9,6 +9,9 @@ import re
 import config
 import nltk
 
+from error_handler import NetworkErrorHandler, handle_exceptions, ErrorCategory, ErrorSeverity
+from dependency_manager import require_dependency
+
 class GoogleScraper:
     """
     Professional Google SERP scraper for SEO analysis
@@ -16,6 +19,17 @@ class GoogleScraper:
     """
     
     def __init__(self):
+        # Initialize error handler
+        self.error_handler = NetworkErrorHandler()
+        
+        # Validate required dependencies
+        try:
+            require_dependency('requests')
+            require_dependency('beautifulsoup4')
+        except ImportError as e:
+            self.error_handler.handle_error(e)
+            raise
+        
         self.session = requests.Session()
         self.user_agents = config.USER_AGENTS
         self.current_ua_index = 0
@@ -26,7 +40,6 @@ class GoogleScraper:
         self.last_request_time = 0
         
         # Setup logging
-        logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
         
         # Setup session headers
@@ -55,9 +68,9 @@ class GoogleScraper:
         # Add current request to window
         self.request_times.append(current_time)
         
-    def make_request(self, url: str, method: str = 'get', **kwargs) -> requests.Response:
+    def make_request(self, url: str, method: str = 'get', **kwargs) -> Optional[requests.Response]:
         """
-        Make HTTP request with exponential backoff retry logic
+        Make HTTP request with exponential backoff retry logic and comprehensive error handling
         
         Args:
             url: URL to request
@@ -65,10 +78,7 @@ class GoogleScraper:
             **kwargs: Additional arguments for requests
             
         Returns:
-            Response object
-            
-        Raises:
-            requests.RequestException after all retries fail
+            Response object or None if all retries fail
         """
         retry_count = 0
         last_exception = None
@@ -90,26 +100,63 @@ class GoogleScraper:
                 
                 return response
                 
-            except requests.RequestException as e:
+            except requests.Timeout as e:
                 retry_count += 1
                 last_exception = e
+                error_info = self.error_handler.handle_network_error(e, url, retry_count)
                 
                 if retry_count <= self.max_retries:
-                    # Calculate exponential backoff delay
-                    delay = min(300, self.retry_delay * (2 ** (retry_count - 1))) # Max 5 minutes
-                    # Add random jitter
+                    delay = min(300, self.retry_delay * (2 ** (retry_count - 1)))
                     delay += random.uniform(0, min(1, delay * 0.1))
                     
                     self.logger.warning(
-                        "Request failed (attempt %d/%d): %s. Retrying in %.1f seconds...",
-                        retry_count, self.max_retries, str(e).replace('\n', '\\n').replace('\r', '\\r'), delay
+                        "Request timeout (attempt %d/%d) for %s. Retrying in %.1f seconds...",
+                        retry_count, self.max_retries, url[:100], delay
                     )
+                    time.sleep(delay)
+                    continue
+            
+            except requests.ConnectionError as e:
+                retry_count += 1
+                last_exception = e
+                error_info = self.error_handler.handle_network_error(e, url, retry_count)
+                
+                if retry_count <= self.max_retries:
+                    delay = min(300, self.retry_delay * (2 ** (retry_count - 1)))
+                    delay += random.uniform(0, min(1, delay * 0.1))
                     
+                    self.logger.warning(
+                        "Connection error (attempt %d/%d) for %s: %s. Retrying in %.1f seconds...",
+                        retry_count, self.max_retries, url[:100], str(e)[:200], delay
+                    )
+                    time.sleep(delay)
+                    continue
+            
+            except requests.RequestException as e:
+                retry_count += 1
+                last_exception = e
+                error_info = self.error_handler.handle_network_error(e, url, retry_count)
+                
+                if retry_count <= self.max_retries:
+                    delay = min(300, self.retry_delay * (2 ** (retry_count - 1)))
+                    delay += random.uniform(0, min(1, delay * 0.1))
+                    
+                    self.logger.warning(
+                        "Request failed (attempt %d/%d) for %s: %s. Retrying in %.1f seconds...",
+                        retry_count, self.max_retries, url[:100], str(e)[:200], delay
+                    )
                     time.sleep(delay)
                     continue
                     
         # If we get here, all retries failed
-        raise last_exception
+        if last_exception:
+            error_info = self.error_handler.handle_network_error(last_exception, url, retry_count)
+            self.logger.error(
+                "All retry attempts failed for %s: %s",
+                url[:100], error_info.user_message
+            )
+        
+        return None
         
     def setup_session(self):
         """Configure session with appropriate headers"""
@@ -131,9 +178,15 @@ class GoogleScraper:
         delay = self.request_delay + random.uniform(0, 2)
         time.sleep(delay)
         
+    @handle_exceptions(
+        category=ErrorCategory.NETWORK,
+        severity=ErrorSeverity.HIGH,
+        user_message="Failed to retrieve search results. Please check your internet connection and try again.",
+        return_value=[]
+    )
     def scrape_google_results(self, query: str, num_results: int = 10) -> List[Dict]:
         """
-        Scrape Google search results for given query
+        Scrape Google search results for given query with comprehensive error handling
         
         Args:
             query: Search query string
@@ -144,33 +197,62 @@ class GoogleScraper:
         """
         results = []
         
+        if not query or not query.strip():
+            self.logger.warning("Empty query provided for Google search")
+            return results
+        
         try:
-            # Prepare search URL
-            encoded_query = quote_plus(query)
-            search_url = f"https://www.google.com/search?q={encoded_query}&num={num_results}"
+            # Prepare search URL with input validation
+            clean_query = query.strip()[:500]  # Limit query length
+            encoded_query = quote_plus(clean_query)
+            search_url = f"https://www.google.com/search?q={encoded_query}&num={min(num_results, 100)}"
             
-            self.logger.info("Scraping Google results for: %s", query.replace('\n', '\\n').replace('\r', '\\r'))
+            self.logger.info("Scraping Google results for: %s", clean_query[:100])
             
             # Make request with retry logic
             response = self.make_request(search_url)
             
-            # Parse results
-            soup = BeautifulSoup(response.content, 'html.parser')
+            if not response:
+                self.logger.error("No response received from Google search")
+                return results
+            
+            # Parse results with error handling
+            try:
+                soup = BeautifulSoup(response.content, 'html.parser')
+            except Exception as e:
+                error_info = self.error_handler.handle_error(e, {
+                    'operation': 'html_parsing',
+                    'url': search_url[:100]
+                })
+                self.logger.error("Failed to parse HTML content: %s", error_info.user_message)
+                return results
             
             # Find search result containers
             result_containers = soup.find_all('div', class_='g')
             
+            if not result_containers:
+                self.logger.warning("No search result containers found - Google may have changed their structure")
+                # Try alternative selectors
+                result_containers = soup.find_all('div', class_=['tF2Cxc', 'g'])
+            
             for i, container in enumerate(result_containers[:num_results]):
-                result_data = self.extract_result_data(container, i + 1)
-                if result_data:
-                    results.append(result_data)
+                try:
+                    result_data = self.extract_result_data(container, i + 1)
+                    if result_data:
+                        results.append(result_data)
+                except Exception as e:
+                    self.logger.warning("Error extracting result %d: %s", i + 1, str(e)[:200])
+                    continue
                     
             self.logger.info("Successfully scraped %d results", len(results))
             
-        except requests.RequestException as e:
-            self.logger.error("Request error while scraping Google: %s", str(e).replace('\n', '\\n').replace('\r', '\\r'))
         except Exception as e:
-            self.logger.error("Unexpected error while scraping Google: %s", str(e).replace('\n', '\\n').replace('\r', '\\r'))
+            error_info = self.error_handler.handle_error(e, {
+                'operation': 'google_scraping',
+                'query': query[:100],
+                'num_results': num_results
+            })
+            self.logger.error("Error scraping Google results: %s", error_info.user_message)
             
         return results
         

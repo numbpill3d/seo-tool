@@ -24,39 +24,44 @@ def check_python_version():
 
 
 def check_dependencies():
-    """Check required dependencies"""
+    """Check required and optional dependencies using centralized manager"""
     print("\nChecking dependencies...")
     
-    required_packages = [
-        'requests', 'beautifulsoup4', 'nltk', 'pandas', 'numpy',
-        'reportlab', 'openpyxl', 'pyyaml', 'python-dotenv'
-    ]
-    
-    missing_packages = []
-    
-    for package in required_packages:
-        try:
-            # Handle package name differences
-            import_name = package
-            if package == 'beautifulsoup4':
-                import_name = 'bs4'
-            elif package == 'python-dotenv':
-                import_name = 'dotenv'
-            elif package == 'pyyaml':
-                import_name = 'yaml'
-                
-            importlib.import_module(import_name)
-            print(f"✓ {package} - OK")
-        except ImportError:
-            print(f"✗ {package} - Missing")
-            missing_packages.append(package)
-    
-    if missing_packages:
-        print(f"\nMissing packages: {', '.join(missing_packages)}")
-        print("Install with: pip install " + " ".join(missing_packages))
+    try:
+        from dependency_manager import dependency_manager
+        
+        # Validate environment
+        is_valid = dependency_manager.validate_requirements()
+        
+        # Print detailed status
+        for dep_name, info in dependency_manager.availability.items():
+            dep = info['dependency']
+            if info['available']:
+                version_info = f" ({info['version']})" if info['version'] else ""
+                print(f"✓ {dep_name}{version_info} - OK")
+            else:
+                status = "Missing (optional)" if dep.dependency_type.value == "optional" else "Missing (required)"
+                print(f"✗ {dep_name} - {status}")
+        
+        # Show installation commands for missing packages
+        missing_required = dependency_manager.get_missing_required()
+        missing_optional = dependency_manager.get_missing_optional()
+        
+        if missing_required:
+            print(f"\nRequired packages to install:")
+            for dep in missing_required:
+                print(f"  {dep.install_command}")
+        
+        if missing_optional:
+            print(f"\nOptional packages (some features may be disabled):")
+            for dep in missing_optional:
+                print(f"  {dep.install_command}")
+        
+        return is_valid
+        
+    except ImportError:
+        print("✗ Dependency manager not available")
         return False
-    
-    return True
 
 
 def check_nltk_data():
